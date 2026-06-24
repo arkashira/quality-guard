@@ -1,47 +1,33 @@
-import pytest
-from quality_guard import QualityGuard, Webhook, Notification
+from quality_guard import CIMetrics, Standard, evaluate_quality_gates, fetch_ci_metrics, get_standards
 
-def test_send_notification():
-    webhooks = [Webhook("https://example.com/webhook1"), Webhook("https://example.com/webhook2", "channel1")]
-    quality_guard = QualityGuard(webhooks)
-    notification = Notification("main", ["metric1", "metric2"], ["2023-03-01 12:00:00", "2023-03-01 12:05:00"])
-    quality_guard.send_notification(notification)
+def test_evaluate_quality_gates_pass():
+    ci_metrics = CIMetrics(coverage=0.8, lint_score=0.9, cyclomatic_complexity=10)
+    standards = [
+        Standard("Standard 1", coverage_threshold=0.7, lint_score_threshold=0.8, cyclomatic_complexity_threshold=15),
+        Standard("Standard 2", coverage_threshold=0.6, lint_score_threshold=0.7, cyclomatic_complexity_threshold=20)
+    ]
+    build_status = evaluate_quality_gates(ci_metrics, standards)
+    assert build_status["pass"] == True
+    assert build_status["violated_standards"] == []
 
-def test_create_payload():
-    webhooks = [Webhook("https://example.com/webhook1"), Webhook("https://example.com/webhook2", "channel1")]
-    quality_guard = QualityGuard(webhooks)
-    notification = Notification("main", ["metric1", "metric2"], ["2023-03-01 12:00:00", "2023-03-01 12:05:00"])
-    payload = quality_guard._create_payload(notification, webhooks[0])
-    assert isinstance(payload, dict)
+def test_evaluate_quality_gates_fail():
+    ci_metrics = CIMetrics(coverage=0.6, lint_score=0.7, cyclomatic_complexity=20)
+    standards = [
+        Standard("Standard 1", coverage_threshold=0.7, lint_score_threshold=0.8, cyclomatic_complexity_threshold=15),
+        Standard("Standard 2", coverage_threshold=0.8, lint_score_threshold=0.9, cyclomatic_complexity_threshold=10)
+    ]
+    build_status = evaluate_quality_gates(ci_metrics, standards)
+    assert build_status["pass"] == False
+    assert len(build_status["violated_standards"]) > 0
 
-def test_create_slack_payload():
-    webhooks = [Webhook("https://example.com/webhook1"), Webhook("https://example.com/webhook2", "channel1")]
-    quality_guard = QualityGuard(webhooks)
-    notification = Notification("main", ["metric1", "metric2"], ["2023-03-01 12:00:00", "2023-03-01 12:05:00"])
-    payload = quality_guard._create_slack_payload(notification, webhooks[1].channel)
-    assert payload["type"] == "section"
-    assert payload["color"] == "danger"
+def test_fetch_ci_metrics():
+    ci_metrics = fetch_ci_metrics()
+    assert ci_metrics.coverage == 0.8
+    assert ci_metrics.lint_score == 0.9
+    assert ci_metrics.cyclomatic_complexity == 10
 
-def test_create_json_payload():
-    webhooks = [Webhook("https://example.com/webhook1"), Webhook("https://example.com/webhook2", "channel1")]
-    quality_guard = QualityGuard(webhooks)
-    notification = Notification("main", ["metric1", "metric2"], ["2023-03-01 12:00:00", "2023-03-01 12:05:00"])
-    payload = quality_guard._create_json_payload(notification)
-    assert payload["branch"] == notification.branch
-    assert payload["failed_metrics"] == notification.failed_metrics
-    assert payload["timestamps"] == notification.timestamps
-
-def test_post_to_webhook():
-    webhooks = [Webhook("https://example.com/webhook1"), Webhook("https://example.com/webhook2", "channel1")]
-    quality_guard = QualityGuard(webhooks)
-    notification = Notification("main", ["metric1", "metric2"], ["2023-03-01 12:00:00", "2023-03-01 12:05:00"])
-    payload = quality_guard._create_payload(notification, webhooks[0])
-    quality_guard._post_to_webhook(webhooks[0].url, payload)
-
-def test_post_to_webhook_failure():
-    webhooks = [Webhook("https://example.com/webhook1"), Webhook("https://example.com/webhook2", "channel1")]
-    quality_guard = QualityGuard(webhooks)
-    notification = Notification("main", ["metric1", "metric2"], ["2023-03-01 12:00:00", "2023-03-01 12:05:00"])
-    payload = quality_guard._create_payload(notification, webhooks[0])
-    quality_guard.delivery_failures[webhooks[0].url] = 3
-    quality_guard._post_to_webhook(webhooks[0].url, payload)
+def test_get_standards():
+    standards = get_standards()
+    assert len(standards) == 2
+    assert standards[0].name == "Standard 1"
+    assert standards[1].name == "Standard 2"
