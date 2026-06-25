@@ -1,6 +1,10 @@
-# Quality Guard
-A Python project for evaluating CI run metrics against defined standards.
+# Technical Debt Prioritizer
+
+This project prioritizes technical debt items based on their business impact and technical risk.
 
 ## Usage
-1. Run `python -m pytest` to execute the tests.
-2. Use the `quality_guard` module to evaluate CI run metrics against defined standards.
+
+1. Create a list of technical debt items with their business goal alignment, code complexity, and age.
+2. Use the `prioritize_technical_debt` function to sort the items based on their impact and risk scores.
+
+## Example
