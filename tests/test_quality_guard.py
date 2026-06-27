@@ -1,33 +1,52 @@
-from quality_guard import CIMetrics, Standard, evaluate_quality_gates, fetch_ci_metrics, get_standards
+from quality_guard import load_quality_model, evaluate_codebase, check_thresholds, print_report, Metric
+import json
+from io import StringIO
+import sys
 
-def test_evaluate_quality_gates_pass():
-    ci_metrics = CIMetrics(coverage=0.8, lint_score=0.9, cyclomatic_complexity=10)
-    standards = [
-        Standard("Standard 1", coverage_threshold=0.7, lint_score_threshold=0.8, cyclomatic_complexity_threshold=15),
-        Standard("Standard 2", coverage_threshold=0.6, lint_score_threshold=0.7, cyclomatic_complexity_threshold=20)
-    ]
-    build_status = evaluate_quality_gates(ci_metrics, standards)
-    assert build_status["pass"] == True
-    assert build_status["violated_standards"] == []
+def test_load_quality_model():
+    quality_model = {'lint': 10, 'cyclomatic_complexity': 20}
+    with open('quality-guard.json', 'w') as f:
+        json.dump(quality_model, f)
+    loaded_model = load_quality_model('quality-guard.json')
+    assert loaded_model == quality_model
 
-def test_evaluate_quality_gates_fail():
-    ci_metrics = CIMetrics(coverage=0.6, lint_score=0.7, cyclomatic_complexity=20)
-    standards = [
-        Standard("Standard 1", coverage_threshold=0.7, lint_score_threshold=0.8, cyclomatic_complexity_threshold=15),
-        Standard("Standard 2", coverage_threshold=0.8, lint_score_threshold=0.9, cyclomatic_complexity_threshold=10)
-    ]
-    build_status = evaluate_quality_gates(ci_metrics, standards)
-    assert build_status["pass"] == False
-    assert len(build_status["violated_standards"]) > 0
+def test_evaluate_codebase():
+    quality_model = {'lint': 10, 'cyclomatic_complexity': 20}
+    metrics = evaluate_codebase(quality_model)
+    assert len(metrics) == 2
+    assert metrics[0].name == 'lint'
+    assert metrics[1].name == 'cyclomatic_complexity'
 
-def test_fetch_ci_metrics():
-    ci_metrics = fetch_ci_metrics()
-    assert ci_metrics.coverage == 0.8
-    assert ci_metrics.lint_score == 0.9
-    assert ci_metrics.cyclomatic_complexity == 10
+def test_check_thresholds():
+    metrics = [Metric('lint', 10, 5), Metric('cyclomatic_complexity', 20, 25)]
+    assert not check_thresholds(metrics)
+    metrics = [Metric('lint', 10, 5), Metric('cyclomatic_complexity', 20, 15)]
+    assert check_thresholds(metrics)
 
-def test_get_standards():
-    standards = get_standards()
-    assert len(standards) == 2
-    assert standards[0].name == "Standard 1"
-    assert standards[1].name == "Standard 2"
+def test_print_report(capsys):
+    metrics = [Metric('lint', 10, 5), Metric('cyclomatic_complexity', 20, 25)]
+    print_report(metrics, False)
+    captured = capsys.readouterr()
+    assert "lint: 5 (threshold: 10)" in captured.out
+    assert "cyclomatic_complexity: 25 (threshold: 20)" in captured.out
+    print_report(metrics, True)
+    captured = capsys.readouterr()
+    assert '{"name": "lint", "threshold": 10, "value": 5}' in captured.out
+    assert '{"name": "cyclomatic_complexity", "threshold": 20, "value": 25}' in captured.out
+
+def test_main():
+    quality_model = {'lint': 10, 'cyclomatic_complexity': 20}
+    with open('quality-guard.json', 'w') as f:
+        json.dump(quality_model, f)
+    sys.argv = ['quality_guard.py']
+    try:
+        from quality_guard import main
+        main()
+    except SystemExit as e:
+        assert e.code == 0
+    sys.argv = ['quality_guard.py', '--json']
+    try:
+        from quality_guard import main
+        main()
+    except SystemExit as e:
+        assert e.code == 0

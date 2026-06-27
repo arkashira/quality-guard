@@ -3,9 +3,10 @@ requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
 
 [tool.poetry]
-name = "technical-debt-prioritizer"
+name = "quality-guard"
 version = "1.0.0"
-description = "Prioritizes technical debt items based on business impact and technical risk"
+description = ""
+authors = ["Your Name"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
